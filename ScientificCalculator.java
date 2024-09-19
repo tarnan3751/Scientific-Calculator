@@ -13,15 +13,16 @@ public class ScientificCalculator extends JFrame implements ActionListener {
         "4", "5", "6", "-", "log",
         "1", "2", "3", "+", "ln",
         "0", ".", "=", "sin", "cos",
-        "tan"
+        "tan", "(-)", "π", "e", "Inv"
     };
 
     private JButton[] buttons = new JButton[buttonLabels.length];
     private StringBuilder input = new StringBuilder();
+    private boolean inverseMode = false; // Tracks whether inverse mode is active
 
     public ScientificCalculator() {
         setTitle("Scientific Calculator");
-        setSize(500, 600); // Increased size to accommodate larger buttons
+        setSize(500, 700); // Increased size to accommodate new buttons
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         // Create display field
@@ -33,7 +34,7 @@ public class ScientificCalculator extends JFrame implements ActionListener {
 
         // Create panel for buttons
         panel = new JPanel();
-        panel.setLayout(new GridLayout(6, 5, 5, 5)); // 6 rows, 5 columns
+        panel.setLayout(new GridLayout(7, 5, 5, 5)); // 7 rows, 5 columns
 
         // Set preferred size for buttons
         Dimension buttonSize = new Dimension(90, 60);
@@ -57,6 +58,8 @@ public class ScientificCalculator extends JFrame implements ActionListener {
         if (command.equals("Clear")) {
             input.setLength(0); // Clear the input
             display.setText(""); // Clear the display
+            inverseMode = false; // Reset inverse mode
+            updateFunctionButtons(); // Reset function button labels
         } else if (command.equals("=")) {
             try {
                 double result = evaluateExpression(input.toString());
@@ -66,21 +69,63 @@ public class ScientificCalculator extends JFrame implements ActionListener {
                 display.setText("Error");
                 input.setLength(0);
             }
+        } else if (command.equals("Inv")) {
+            inverseMode = !inverseMode; // Toggle inverse mode
+            updateFunctionButtons();
+        } else if (command.equals("(-)")) {
+            input.append("(-1)*");
+            display.setText(input.toString());
+        } else if (command.equals("π")) {
+            input.append("pi");
+            display.setText(input.toString());
+        } else if (command.equals("e")) {
+            input.append("e");
+            display.setText(input.toString());
+        } else if (isFunctionButton(command)) {
+            // Handle function buttons
+            String functionToken = getFunctionToken(command);
+            input.append(functionToken + "(");
+            display.setText(input.toString());
         } else {
             input.append(command);
             display.setText(input.toString());
         }
     }
 
+    // Update function button labels based on inverse mode
+    private void updateFunctionButtons() {
+        for (int i = 0; i < buttons.length; i++) {
+            String label = buttons[i].getText();
+            if (label.equals("sin") || label.equals("asin")) {
+                buttons[i].setText(inverseMode ? "asin" : "sin");
+            } else if (label.equals("cos") || label.equals("acos")) {
+                buttons[i].setText(inverseMode ? "acos" : "cos");
+            } else if (label.equals("tan") || label.equals("atan")) {
+                buttons[i].setText(inverseMode ? "atan" : "tan");
+            } else if (label.equals("log") || label.equals("10^x")) {
+                buttons[i].setText(inverseMode ? "10^x" : "log");
+            } else if (label.equals("ln") || label.equals("e^x")) {
+                buttons[i].setText(inverseMode ? "e^x" : "ln");
+            }
+        }
+    }
+
     // Evaluate the mathematical expression
     private double evaluateExpression(String expression) throws Exception {
         // Replace functions with single-letter tokens
+        expression = expression.replaceAll("asin", "S");
+        expression = expression.replaceAll("acos", "C");
+        expression = expression.replaceAll("atan", "T");
+        expression = expression.replaceAll("10\\^x", "G");
+        expression = expression.replaceAll("e\\^x", "E");
         expression = expression.replaceAll("sin", "s");
         expression = expression.replaceAll("cos", "c");
         expression = expression.replaceAll("tan", "t");
         expression = expression.replaceAll("log", "g");
         expression = expression.replaceAll("ln", "l");
         expression = expression.replaceAll("sqrt", "q");
+        expression = expression.replaceAll("pi", String.valueOf(Math.PI));
+        expression = expression.replaceAll("\\be\\b", String.valueOf(Math.E));
 
         // Convert infix expression to postfix notation
         String postfix = infixToPostfix(expression);
@@ -145,7 +190,19 @@ public class ScientificCalculator extends JFrame implements ActionListener {
     }
 
     private boolean isFunction(char c) {
-        return c == 's' || c == 'c' || c == 't' || c == 'g' || c == 'l' || c == 'q';
+        return c == 's' || c == 'c' || c == 't' || c == 'g' || c == 'l' || c == 'q'
+            || c == 'S' || c == 'C' || c == 'T' || c == 'G' || c == 'E';
+    }
+
+    private boolean isFunctionButton(String label) {
+        return label.equals("sin") || label.equals("cos") || label.equals("tan")
+            || label.equals("asin") || label.equals("acos") || label.equals("atan")
+            || label.equals("log") || label.equals("ln") || label.equals("10^x") || label.equals("e^x")
+            || label.equals("sqrt");
+    }
+
+    private String getFunctionToken(String label) {
+        return label;
     }
 
     private boolean isOperator(char c) {
@@ -155,13 +212,13 @@ public class ScientificCalculator extends JFrame implements ActionListener {
     private int precedence(char op) {
         switch (op) {
             case '^':
-                return 3;
+                return 4;
             case '*':
             case '/':
-                return 2;
+                return 3;
             case '+':
             case '-':
-                return 1;
+                return 2;
             default:
                 return 0;
         }
@@ -204,26 +261,43 @@ public class ScientificCalculator extends JFrame implements ActionListener {
                 if (stack.isEmpty()) throw new Exception("Invalid expression");
                 double a = stack.pop();
                 switch (c) {
-                    case 's':
+                    case 's': // sin
                         stack.push(Math.sin(Math.toRadians(a)));
                         break;
-                    case 'c':
+                    case 'c': // cos
                         stack.push(Math.cos(Math.toRadians(a)));
                         break;
-                    case 't':
+                    case 't': // tan
                         stack.push(Math.tan(Math.toRadians(a)));
                         break;
-                    case 'g':
+                    case 'g': // log
                         if (a <= 0) throw new Exception("Logarithm of non-positive number");
                         stack.push(Math.log10(a));
                         break;
-                    case 'l':
+                    case 'l': // ln
                         if (a <= 0) throw new Exception("Logarithm of non-positive number");
                         stack.push(Math.log(a));
                         break;
-                    case 'q':
+                    case 'q': // sqrt
                         if (a < 0) throw new Exception("Square root of negative number");
                         stack.push(Math.sqrt(a));
+                        break;
+                    case 'S': // asin
+                        if (a < -1 || a > 1) throw new Exception("Invalid input for arcsin");
+                        stack.push(Math.toDegrees(Math.asin(a)));
+                        break;
+                    case 'C': // acos
+                        if (a < -1 || a > 1) throw new Exception("Invalid input for arccos");
+                        stack.push(Math.toDegrees(Math.acos(a)));
+                        break;
+                    case 'T': // atan
+                        stack.push(Math.toDegrees(Math.atan(a)));
+                        break;
+                    case 'G': // 10^x
+                        stack.push(Math.pow(10, a));
+                        break;
+                    case 'E': // e^x
+                        stack.push(Math.exp(a));
                         break;
                 }
             } else {
