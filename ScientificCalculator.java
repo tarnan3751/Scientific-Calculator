@@ -73,7 +73,13 @@ public class ScientificCalculator extends JFrame implements ActionListener {
             inverseMode = !inverseMode; // Toggle inverse mode
             updateFunctionButtons();
         } else if (command.equals("(-)")) {
-            input.append("(-1)*");
+            // Append unary minus if appropriate
+            if (input.length() == 0 || lastCharIsOperatorOrParen(input)) {
+                input.append("-");
+            } else {
+                // If not appropriate, append "*(-1)*" to handle expressions like 5*(-1)*2
+                input.append("*(-1)*");
+            }
             display.setText(input.toString());
         } else if (command.equals("π")) {
             input.append("pi");
@@ -90,6 +96,13 @@ public class ScientificCalculator extends JFrame implements ActionListener {
             input.append(command);
             display.setText(input.toString());
         }
+    }
+
+    // Helper method to check if the last character is an operator or '('
+    private boolean lastCharIsOperatorOrParen(StringBuilder input) {
+        if (input.length() == 0) return true;
+        char lastChar = input.charAt(input.length() - 1);
+        return isOperator(lastChar) || lastChar == '(';
     }
 
     // Update function button labels based on inverse mode
@@ -169,11 +182,28 @@ public class ScientificCalculator extends JFrame implements ActionListener {
                     postfix.append(stack.pop()).append(' ');
                 }
                 i++;
+            } else if (c == '-') {
+                // Check for unary minus
+                if (i == 0 || (infix.charAt(i - 1) == '(' || isOperator(infix.charAt(i - 1)))) {
+                    // It's unary minus
+                    stack.push('~'); // Using '~' to represent unary minus
+                    i++;
+                } else {
+                    // Binary minus operator
+                    while (!stack.isEmpty() && precedence(stack.peek()) >= precedence(c)) {
+                        postfix.append(stack.pop()).append(' ');
+                    }
+                    stack.push(c);
+                    i++;
+                }
             } else if (isOperator(c)) {
                 while (!stack.isEmpty() && precedence(stack.peek()) >= precedence(c)) {
                     postfix.append(stack.pop()).append(' ');
                 }
                 stack.push(c);
+                i++;
+            } else if (Character.isWhitespace(c)) {
+                // Skip whitespace
                 i++;
             } else {
                 throw new Exception("Invalid character: " + c);
@@ -206,11 +236,13 @@ public class ScientificCalculator extends JFrame implements ActionListener {
     }
 
     private boolean isOperator(char c) {
-        return c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
+        return c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '~';
     }
 
     private int precedence(char op) {
         switch (op) {
+            case '~':
+                return 5; // Highest precedence for unary minus
             case '^':
                 return 4;
             case '*':
@@ -234,27 +266,34 @@ public class ScientificCalculator extends JFrame implements ActionListener {
                 // Number
                 stack.push(Double.parseDouble(token));
             } else if (isOperator(c)) {
-                // Operator
-                if (stack.size() < 2) throw new Exception("Invalid expression");
-                double b = stack.pop();
-                double a = stack.pop();
-                switch (c) {
-                    case '+':
-                        stack.push(a + b);
-                        break;
-                    case '-':
-                        stack.push(a - b);
-                        break;
-                    case '*':
-                        stack.push(a * b);
-                        break;
-                    case '/':
-                        if (b == 0) throw new Exception("Division by zero");
-                        stack.push(a / b);
-                        break;
-                    case '^':
-                        stack.push(Math.pow(a, b));
-                        break;
+                if (c == '~') {
+                    // Unary minus
+                    if (stack.isEmpty()) throw new Exception("Invalid expression");
+                    double a = stack.pop();
+                    stack.push(-a);
+                } else {
+                    // Binary operator
+                    if (stack.size() < 2) throw new Exception("Invalid expression");
+                    double b = stack.pop();
+                    double a = stack.pop();
+                    switch (c) {
+                        case '+':
+                            stack.push(a + b);
+                            break;
+                        case '-':
+                            stack.push(a - b);
+                            break;
+                        case '*':
+                            stack.push(a * b);
+                            break;
+                        case '/':
+                            if (b == 0) throw new Exception("Division by zero");
+                            stack.push(a / b);
+                            break;
+                        case '^':
+                            stack.push(Math.pow(a, b));
+                            break;
+                    }
                 }
             } else if (isFunction(c)) {
                 // Function
